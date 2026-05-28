@@ -2,44 +2,41 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ShoSNS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShoBBS</title>
     <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <style>
-        :root { --bg: #020617; --card: rgba(15, 23, 42, 0.9); --accent: #00f2ff; --text: #e2e8f0; }
-        body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; min-height: 100vh; }
-        .main-wrapper { width: 100%; max-width: 1000px; padding: 20px; box-sizing: border-box; }
-        h1 { text-align: center; color: var(--accent); letter-spacing: 5px; }
-        .panel { background: var(--card); border: 1px solid var(--accent); padding: 20px; border-radius: 4px; margin-bottom: 20px; }
-        .vc-panel { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); padding: 15px; margin-bottom: 20px; text-align: center; }
-        .status-dot { display: inline-block; width: 10px; height: 10px; background: #334155; border-radius: 50%; margin-right: 8px; }
-        input, textarea { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.7); color: var(--accent); border: 1px solid #1e293b; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button:hover { background: var(--accent); color: #000; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .post-card { background: rgba(255, 255, 255, 0.03); padding: 15px; border-left: 3px solid var(--accent); margin-bottom: 10px; }
-        .tab-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 0.9em; display: block; text-align: center; margin-top: 15px; }
+        :root { --bg: #eee; --text: #000; --link: #0000ff; --border: #ccc; }
+        body { background: var(--bg); font-family: "MS PGothic", "IPAMonaPGothic", sans-serif; font-size: 16px; margin: 0; padding: 10px; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; border: 2px solid var(--border); padding: 15px; }
+        h1 { color: #ff0000; font-size: 1.5em; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        
+        /* 2ch風スレッドスタイル */
+        .thread-header { background: #efefef; padding: 10px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .post { border-bottom: 1px dashed var(--border); padding: 10px 0; }
+        .post-info { color: #228b22; font-weight: bold; font-size: 0.9em; }
+        .post-num { color: var(--link); margin-right: 5px; }
+        .post-body { margin-top: 5px; white-space: pre-wrap; line-height: 1.4; }
+        
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 8px; border: 1px solid var(--border); }
+        button { background: #f0f0f0; border: 1px solid #999; padding: 5px 15px; cursor: pointer; }
+        
+        .vc-badge { font-size: 0.7em; background: #333; color: #fff; padding: 2px 5px; border-radius: 3px; cursor: pointer; float: right; }
     </style>
 </head>
 <body>
 
-<div id="root" class="main-wrapper">
-    <div id="auth-box" class="panel" style="max-width:400px; margin: 100px auto;">
-        <h1>ShoSNS</h1>
-        <div id="auth-form">
-            <input type="text" id="loginId" placeholder="ユーザーID">
-            <input type="password" id="pinCode" placeholder="PINコード">
-            <button onclick="login()">ログイン</button>
-            <span class="tab-link" onclick="toggleAuth(true)">新規登録（申請）はこちら</span>
-        </div>
-        <div id="register-form" style="display:none;">
-            <p style="font-size:0.8em; color:var(--accent);">※登録には管理者の承認が必要です</p>
-            <input type="text" id="regId" placeholder="希望ユーザーID">
-            <input type="password" id="regPin" placeholder="希望PINコード (数字4桁など)">
-            <button onclick="register()">利用申請を送る</button>
-            <span class="tab-link" onclick="toggleAuth(false)">ログインに戻る</span>
-        </div>
+<div id="root" class="container">
+    <div id="auth-box">
+        <h1>ShoBBS - ログイン</h1>
+        <input type="text" id="loginId" placeholder="ID">
+        <input type="password" id="pinCode" placeholder="PIN">
+        <button onclick="login()">ログイン</button>
+        <hr>
+        <p style="font-size:0.8em;">新規登録（申請）</p>
+        <input type="text" id="regId" placeholder="希望ID">
+        <input type="password" id="regPin" placeholder="希望PIN">
+        <button onclick="register()">申請</button>
     </div>
 </div>
 
@@ -61,132 +58,111 @@
         appId: "1:377338728077:web:1205ed292e4181869adcc4"
     };
 
-    // 初期化
     window.onload = () => {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        // SkyWay SDKの読み込み待機
-        const checkSkyWay = setInterval(() => {
+        setTimeout(() => {
             if (window.skyway_sdk_core) {
                 SkyWayContext = skyway_sdk_core.SkyWayContext;
                 SkyWayRoom = skyway_sdk_core.SkyWayRoom;
                 SkyWayStreamFactory = skyway_sdk_core.SkyWayStreamFactory;
-                clearInterval(checkSkyWay);
-                console.log("SkyWay Ready");
             }
-        }, 500);
+        }, 1000);
     };
 
-    function toggleAuth(isReg) {
-        document.getElementById('auth-form').style.display = isReg ? 'none' : 'block';
-        document.getElementById('register-form').style.display = isReg ? 'block' : 'none';
-    }
-
-    // --- 新規登録機能 ---
     async function register() {
-        const id = document.getElementById('regId').value.trim();
-        const pin = document.getElementById('regPin').value.trim();
-        if(!id || !pin) return alert("入力してね");
-        
-        try {
-            await db.collection("requests").add({
-                userId: id,
-                pin: pin,
-                isApproved: false, // 最初は未承認
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            alert("申請を送りました！管理者が承認するまで待ってね。");
-            toggleAuth(false);
-        } catch (e) { alert("申請エラー"); }
+        const id = document.getElementById('regId').value;
+        const pin = document.getElementById('regPin').value;
+        if(!id || !pin) return alert("入力して");
+        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert("申請完了。管理者がFirestoreでisApprovedをtrueにするまで待ってね。");
     }
 
     async function login() {
         const id = document.getElementById('loginId').value;
         const pin = document.getElementById('pinCode').value;
-        try {
-            const snapshot = await db.collection("requests").where("userId", "==", id).get();
-            if (snapshot.empty) return alert("ユーザーがいないか、承認待ちです");
-            const data = snapshot.docs[0].data();
-            if (data.pin == pin && data.isApproved) {
-                currentUserName = id;
-                showMainPage();
-            } else { alert("PINが違うか、まだ承認されていません"); }
-        } catch (e) { alert("エラー"); }
+        const snap = await db.collection("requests").where("userId", "==", id).get();
+        if (snap.empty) return alert("ユーザーなし");
+        const data = snap.docs[0].data();
+        if (data.pin == pin && data.isApproved) {
+            currentUserName = id;
+            showMainPage();
+        } else { alert("未承認またはPIN違い"); }
     }
 
     function showMainPage() {
         document.getElementById('root').innerHTML = `
-            <h1>ShoSNS</h1>
-            <div class="grid-layout">
-                <div class="panel">
-                    <div class="vc-panel">
-                        <div><span id="vc-dot" class="status-dot"></span>VOICE ROOM</div>
-                        <button id="joinBtn" onclick="joinVC()">入室する</button>
-                    </div>
-                    <textarea id="postInput" placeholder="今なにしてる？"></textarea>
-                    <button onclick="sendPost()">投稿する</button>
-                </div>
-                <div id="timeline"></div>
+            <div class="vc-badge" id="vcBtn" onclick="joinVC()">ボイスチャット開始</div>
+            <h1>ShoBBS: 雑談スレッド</h1>
+            <div id="thread-area"></div>
+            <div class="thread-header" style="margin-top:20px;">
+                <b>レスを書き込む</b><br>
+                <textarea id="postInput" rows="4" placeholder="内容を入力してください"></textarea>
+                <button onclick="sendPost()">書き込む</button>
+                <button onclick="location.reload()">ログアウト</button>
             </div>
         `;
         loadPosts();
-    }
-
-    // --- ボイチャ強化版 ---
-    async function joinVC() {
-        if (!SkyWayContext) return alert("通信準備中...あと5秒待って");
-        const btn = document.getElementById('joinBtn');
-        const dot = document.getElementById('vc-dot');
-        btn.disabled = true;
-        btn.innerText = "接続中...";
-
-        try {
-            const audioStream = await SkyWayStreamFactory.createMicrophoneAudioStream();
-            const context = await SkyWayContext.Create(appId);
-            const room = await SkyWayRoom.FindOrCreate(context, { type: 'p2p', name: 'ShoRoom' });
-            const me = await room.join();
-            await me.publish(audioStream);
-
-            room.onStreamPublished.add(async (e) => {
-                if (e.publication.publisherId === me.id) return;
-                const { stream } = await me.subscribe(e.publication.id);
-                const audio = document.createElement('audio');
-                audio.srcObject = stream.track;
-                audio.autoplay = true;
-                audio.playsInline = true;
-                document.body.appendChild(audio);
-            });
-
-            btn.innerText = "通話中";
-            dot.style.background = "#00ff00";
-        } catch (e) {
-            console.error(e);
-            alert("失敗！原因: " + e.message);
-            btn.disabled = false;
-            btn.innerText = "再試行";
-        }
     }
 
     async function sendPost() {
         const input = document.getElementById('postInput');
         if(!input.value.trim()) return;
         await db.collection("posts").add({
-            user: currentUserName, text: input.value,
+            user: currentUserName,
+            text: input.value,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         input.value = "";
     }
 
     function loadPosts() {
-        db.collection("posts").orderBy("createdAt", "desc").onSnapshot(ss => {
-            const tl = document.getElementById('timeline');
-            if(!tl) return;
-            tl.innerHTML = "";
+        db.collection("posts").orderBy("createdAt", "asc").onSnapshot(ss => {
+            const area = document.getElementById('thread-area');
+            if(!area) return;
+            area.innerHTML = "";
+            let count = 1;
             ss.forEach(doc => {
                 const p = doc.data();
-                tl.innerHTML += `<div class="post-card"><b>${p.user}</b><br>${p.text}</div>`;
+                const time = p.createdAt ? new Date(p.createdAt.seconds * 1000).toLocaleString() : "";
+                area.innerHTML += `
+                    <div class="post">
+                        <div class="post-info">
+                            <span class="post-num">${count}</span>
+                            名前：${p.user} ：${time}
+                        </div>
+                        <div class="post-body">${p.text}</div>
+                    </div>
+                `;
+                count++;
             });
         });
+    }
+
+    async function joinVC() {
+        if(!SkyWayContext) return alert("SkyWay読み込み中...もう一度押して");
+        const btn = document.getElementById('vcBtn');
+        btn.innerText = "接続中...";
+        try {
+            const context = await SkyWayContext.Create(appId);
+            const room = await SkyWayRoom.FindOrCreate(context, { type: 'p2p', name: 'ShoRoom' });
+            const stream = await SkyWayStreamFactory.createMicrophoneAudioStream();
+            const me = await room.join();
+            await me.publish(stream);
+            room.onStreamPublished.add(async (e) => {
+                if (e.publication.publisherId === me.id) return;
+                const { stream: remoteStream } = await me.subscribe(e.publication.id);
+                const audio = document.createElement('audio');
+                audio.srcObject = remoteStream.track;
+                audio.autoplay = true;
+                document.body.appendChild(audio);
+            });
+            btn.innerText = "ボイチャ中 (ON)";
+            btn.style.background = "#ff0000";
+        } catch (e) {
+            alert("ボイチャ失敗: " + e.message);
+            btn.innerText = "ボイチャ失敗 (リトライ)";
+        }
     }
 </script>
 </body>
