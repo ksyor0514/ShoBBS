@@ -1,15 +1,65 @@
-{
-  "name": "ShoSNS",
-  "short_name": "ShoSNS",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#020617",
-  "theme_color": "#00f2ff",
-  "icons": [
-    {
-      "src": "https://cdn-icons-png.flaticon.com/512/575/575454.png",
-      "sizes": "512x512",
-      "type": "image/png"
+<script>
+    // --- 1. 変数の宣言は一番最初にまとめる！ ---
+    const appId = "e78d2560-389d-4d0e-a981-5214050d87ca";
+    const firebaseConfig = {
+        apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
+        authDomain: "t1s-sns.firebaseapp.com",
+        projectId: "t1s-sns",
+        storageBucket: "t1s-sns.appspot.com",
+        messagingSenderId: "377338728077",
+        appId: "1:377338728077:web:1205ed292e4181869adcc4"
+    };
+
+    // Firebase初期化
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const { SkyWayContext, SkyWayRoom, SkyWayStreamFactory } = skyway_sdk_core;
+
+    // ここが大事！エラーの原因はこいつの位置
+    let currentUserName = "Guest"; 
+
+    // --- 2. ログイン関数 ---
+    async function login() {
+        const idInput = document.getElementById('loginId');
+        const pinInput = document.getElementById('pinCode');
+        const id = idInput.value;
+        const pin = pinInput.value;
+        
+        try {
+            const snapshot = await db.collection("requests").where("userId", "==", id).get();
+            if (snapshot.empty) return alert("ユーザーが見つかりません");
+            
+            const data = snapshot.docs[0].data();
+            // PINの型が違っても通るように == を使う
+            if (data.pin == pin && data.isApproved) {
+                currentUserName = id; // ここで名前を上書き！
+                showMainPage(id);
+            } else {
+                alert("PINが違うか、承認されていません");
+            }
+        } catch (e) {
+            alert("ログインエラー: " + e.message);
+        }
     }
-  ]
-}
+
+    // --- 3. 投稿関数（ここも修正） ---
+    async function sendPost() {
+        const textInput = document.getElementById('postInput');
+        const text = textInput.value;
+        if(!text.trim()) return;
+
+        // currentUserName が空っぽにならないようにチェック
+        if(!currentUserName) {
+            alert("再ログインしてください");
+            return;
+        }
+
+        await db.collection("posts").add({ 
+            user: currentUserName, 
+            text: text, 
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+        });
+        textInput.value = "";
+    }
+
+    // ... 残りの showMainPage や joinVC はそのままでOK ...
