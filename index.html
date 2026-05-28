@@ -3,52 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShoBBS</title>
-    <link rel="manifest" href="manifest.json">
+    <title>ShoBBS 2.0</title>
     <style>
-        :root { --bg: #eee; --text: #000; --link: #0000ff; --border: #ccc; }
-        body { background: var(--bg); font-family: "MS PGothic", "IPAMonaPGothic", sans-serif; font-size: 16px; margin: 0; padding: 10px; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; border: 2px solid var(--border); padding: 15px; }
-        h1 { color: #ff0000; font-size: 1.5em; text-align: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        :root { --bg: #efefef; --w-bg: #fff; --border: #ccc; --link: #0000ff; }
+        body { background: var(--bg); font-family: "MS PGothic", sans-serif; padding: 10px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--w-bg); border: 2px solid var(--border); min-height: 100vh; padding: 15px; }
+        h1 { color: #f00; text-align: center; font-size: 1.4em; }
         
-        /* 2ch風スレッドスタイル */
-        .thread-header { background: #efefef; padding: 10px; border: 1px solid var(--border); margin-bottom: 20px; }
+        /* スレッド一覧 */
+        .thread-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--link); }
+        .thread-item:hover { background: #f9f9f9; text-decoration: underline; }
+        
+        /* 書き込み/スレ立てフォーム */
+        .form-area { background: #f0f0f0; border: 1px solid var(--border); padding: 15px; margin: 20px 0; }
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 5px; }
+        
+        /* レス表示 */
         .post { border-bottom: 1px dashed var(--border); padding: 10px 0; }
-        .post-info { color: #228b22; font-weight: bold; font-size: 0.9em; }
-        .post-num { color: var(--link); margin-right: 5px; }
-        .post-body { margin-top: 5px; white-space: pre-wrap; line-height: 1.4; }
+        .post-info { color: #228b22; font-size: 0.9em; font-weight: bold; }
+        .post-body { margin-top: 5px; white-space: pre-wrap; }
         
-        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 8px; border: 1px solid var(--border); }
-        button { background: #f0f0f0; border: 1px solid #999; padding: 5px 15px; cursor: pointer; }
-        
-        .vc-badge { font-size: 0.7em; background: #333; color: #fff; padding: 2px 5px; border-radius: 3px; cursor: pointer; float: right; }
+        .nav-bar { margin-bottom: 10px; }
+        .btn { background: #eee; border: 1px solid #999; cursor: pointer; padding: 3px 10px; }
     </style>
 </head>
 <body>
 
 <div id="root" class="container">
-    <div id="auth-box">
-        <h1>ShoBBS - ログイン</h1>
-        <input type="text" id="loginId" placeholder="ID">
-        <input type="password" id="pinCode" placeholder="PIN">
-        <button onclick="login()">ログイン</button>
-        <hr>
-        <p style="font-size:0.8em;">新規登録（申請）</p>
-        <input type="text" id="regId" placeholder="希望ID">
-        <input type="password" id="regPin" placeholder="希望PIN">
-        <button onclick="register()">申請</button>
     </div>
-</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@skyway-sdk/core/dist/skyway_core.js"></script>
 
 <script>
     let currentUserName = "";
-    let db, SkyWayContext, SkyWayRoom, SkyWayStreamFactory;
+    let currentThreadId = null; // どのスレッドを見ているか
+    let db;
 
-    const appId = "e78d2560-389d-4d0e-a981-5214050d87ca";
     const firebaseConfig = {
         apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
         authDomain: "t1s-sns.firebaseapp.com",
@@ -61,21 +52,22 @@
     window.onload = () => {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        setTimeout(() => {
-            if (window.skyway_sdk_core) {
-                SkyWayContext = skyway_sdk_core.SkyWayContext;
-                SkyWayRoom = skyway_sdk_core.SkyWayRoom;
-                SkyWayStreamFactory = skyway_sdk_core.SkyWayStreamFactory;
-            }
-        }, 1000);
+        showLoginPage();
     };
 
-    async function register() {
-        const id = document.getElementById('regId').value;
-        const pin = document.getElementById('regPin').value;
-        if(!id || !pin) return alert("入力して");
-        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        alert("申請完了。管理者がFirestoreでisApprovedをtrueにするまで待ってね。");
+    // --- ログイン/登録画面 ---
+    function showLoginPage() {
+        document.getElementById('root').innerHTML = `
+            <h1>ShoBBS - ログイン</h1>
+            <input type="text" id="loginId" placeholder="ID">
+            <input type="password" id="pinCode" placeholder="PIN">
+            <button class="btn" onclick="login()">ログイン</button>
+            <hr>
+            <p>新規申請</p>
+            <input type="text" id="regId" placeholder="希望ID">
+            <input type="password" id="regPin" placeholder="希望PIN">
+            <button class="btn" onclick="register()">申請</button>
+        `;
     }
 
     async function login() {
@@ -86,51 +78,94 @@
         const data = snap.docs[0].data();
         if (data.pin == pin && data.isApproved) {
             currentUserName = id;
-            showMainPage();
+            showThreadList();
         } else { alert("未承認またはPIN違い"); }
     }
 
-    function showMainPage() {
+    async function register() {
+        const id = document.getElementById('regId').value;
+        const pin = document.getElementById('regPin').value;
+        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert("申請完了");
+    }
+
+    // --- スレッド一覧画面 ---
+    function showThreadList() {
+        currentThreadId = null;
         document.getElementById('root').innerHTML = `
-            <div class="vc-badge" id="vcBtn" onclick="joinVC()">ボイスチャット開始</div>
-            <h1>ShoBBS: 雑談スレッド</h1>
-            <div id="thread-area"></div>
-            <div class="thread-header" style="margin-top:20px;">
-                <b>レスを書き込む</b><br>
-                <textarea id="postInput" rows="4" placeholder="内容を入力してください"></textarea>
-                <button onclick="sendPost()">書き込む</button>
-                <button onclick="location.reload()">ログアウト</button>
+            <h1>ShoBBS - スレッド一覧</h1>
+            <div class="nav-bar"><button class="btn" onclick="location.reload()">ログアウト</button></div>
+            <div id="list-area">読み込み中...</div>
+            <div class="form-area">
+                <b>新規スレッド作成</b>
+                <input type="text" id="newThreadTitle" placeholder="スレッドタイトル">
+                <textarea id="firstPost" placeholder="最初の書き込み"></textarea>
+                <button class="btn" onclick="createThread()">スレッドを立てる</button>
             </div>
         `;
-        loadPosts();
+        
+        db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
+            const area = document.getElementById('list-area');
+            if(!area || currentThreadId) return;
+            area.innerHTML = "";
+            ss.forEach(doc => {
+                const t = doc.data();
+                const div = document.createElement('div');
+                div.className = "thread-item";
+                div.innerText = `■ ${t.title}`;
+                div.onclick = () => showThreadDetail(doc.id, t.title);
+                area.appendChild(div);
+            });
+        });
     }
 
-    async function sendPost() {
-        const input = document.getElementById('postInput');
-        if(!input.value.trim()) return;
-        await db.collection("posts").add({
-            user: currentUserName,
-            text: input.value,
+    // --- スレッド作成 ---
+    async function createThread() {
+        const title = document.getElementById('newThreadTitle').value;
+        const text = document.getElementById('firstPost').value;
+        if(!title || !text) return alert("全部入力して");
+
+        const threadRef = await db.collection("threads").add({
+            title: title,
+            creator: currentUserName,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        input.value = "";
+
+        // 最初の1レス目も保存
+        await db.collection("posts").add({
+            threadId: threadRef.id,
+            user: currentUserName,
+            text: text,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showThreadDetail(threadRef.id, title);
     }
 
-    function loadPosts() {
-        db.collection("posts").orderBy("createdAt", "asc").onSnapshot(ss => {
-            const area = document.getElementById('thread-area');
+    // --- スレッド詳細（レス一覧） ---
+    function showThreadDetail(id, title) {
+        currentThreadId = id;
+        document.getElementById('root').innerHTML = `
+            <div class="nav-bar"><button class="btn" onclick="showThreadList()">一覧に戻る</button></div>
+            <h1>${title}</h1>
+            <div id="post-area">読み込み中...</div>
+            <div class="form-area">
+                <b>レスを書く</b>
+                <textarea id="replyText" rows="4"></textarea>
+                <button class="btn" onclick="sendReply()">書き込む</button>
+            </div>
+        `;
+
+        db.collection("posts").where("threadId", "==", id).orderBy("createdAt", "asc").onSnapshot(ss => {
+            const area = document.getElementById('post-area');
             if(!area) return;
             area.innerHTML = "";
             let count = 1;
             ss.forEach(doc => {
                 const p = doc.data();
-                const time = p.createdAt ? new Date(p.createdAt.seconds * 1000).toLocaleString() : "";
                 area.innerHTML += `
                     <div class="post">
-                        <div class="post-info">
-                            <span class="post-num">${count}</span>
-                            名前：${p.user} ：${time}
-                        </div>
+                        <div class="post-info">${count} ：${p.user}</div>
                         <div class="post-body">${p.text}</div>
                     </div>
                 `;
@@ -139,30 +174,16 @@
         });
     }
 
-    async function joinVC() {
-        if(!SkyWayContext) return alert("SkyWay読み込み中...もう一度押して");
-        const btn = document.getElementById('vcBtn');
-        btn.innerText = "接続中...";
-        try {
-            const context = await SkyWayContext.Create(appId);
-            const room = await SkyWayRoom.FindOrCreate(context, { type: 'p2p', name: 'ShoRoom' });
-            const stream = await SkyWayStreamFactory.createMicrophoneAudioStream();
-            const me = await room.join();
-            await me.publish(stream);
-            room.onStreamPublished.add(async (e) => {
-                if (e.publication.publisherId === me.id) return;
-                const { stream: remoteStream } = await me.subscribe(e.publication.id);
-                const audio = document.createElement('audio');
-                audio.srcObject = remoteStream.track;
-                audio.autoplay = true;
-                document.body.appendChild(audio);
-            });
-            btn.innerText = "ボイチャ中 (ON)";
-            btn.style.background = "#ff0000";
-        } catch (e) {
-            alert("ボイチャ失敗: " + e.message);
-            btn.innerText = "ボイチャ失敗 (リトライ)";
-        }
+    async function sendReply() {
+        const text = document.getElementById('replyText').value;
+        if(!text.trim()) return;
+        await db.collection("posts").add({
+            threadId: currentThreadId,
+            user: currentUserName,
+            text: text,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        document.getElementById('replyText').value = "";
     }
 </script>
 </body>
