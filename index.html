@@ -20,7 +20,7 @@
         button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; }
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         #timeline { display: flex; flex-direction: column; gap: 15px; }
-        .post-card { background: rgba(255, 255, 255, 0.03); padding: 15px; border-left: 3px solid var(--accent); }
+        .post-card { background: rgba(255, 255, 255, 0.03); padding: 15px; border-left: 3px solid var(--accent); margin-bottom: 10px; }
         .auth-container { max-width: 400px; margin: 100px auto; }
     </style>
 </head>
@@ -40,7 +40,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
+    // 変数の準備
     let currentUserName = "";
+    let db, SkyWayContext, SkyWayRoom, SkyWayStreamFactory;
+
     const appId = "e78d2560-389d-4d0e-a981-5214050d87ca";
     const firebaseConfig = {
         apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
@@ -51,9 +54,16 @@
         appId: "1:377338728077:web:1205ed292e4181869adcc4"
     };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const { SkyWayContext, SkyWayRoom, SkyWayStreamFactory } = skyway_sdk_core;
+    // 読み込み完了後に初期化（これがInitializationエラー対策）
+    window.onload = () => {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        if (typeof skyway_sdk_core !== 'undefined') {
+            SkyWayContext = skyway_sdk_core.SkyWayContext;
+            SkyWayRoom = skyway_sdk_core.SkyWayRoom;
+            SkyWayStreamFactory = skyway_sdk_core.SkyWayStreamFactory;
+        }
+    };
 
     async function login() {
         const id = document.getElementById('loginId').value;
@@ -94,35 +104,26 @@
         btn.innerText = "接続中...";
 
         try {
-            // Context作成を先に行う
             const context = await SkyWayContext.Create(appId);
             const room = await SkyWayRoom.FindOrCreate(context, { type: 'p2p', name: 'ShoRoom' });
-            
-            // マイク取得を試行
-            const audioStream = await SkyWayStreamFactory.createMicrophoneAudioStream().catch(e => {
-                throw new Error("マイクを起動できません。ブラウザの設定を確認してください。");
-            });
-
+            const audioStream = await SkyWayStreamFactory.createMicrophoneAudioStream();
             const me = await room.join();
             await me.publish(audioStream);
 
-            const subscribe = async (publication) => {
-                if (publication.publisherId === me.id) return;
-                const { stream } = await me.subscribe(publication.id);
+            room.onStreamPublished.add(async (e) => {
+                if (e.publication.publisherId === me.id) return;
+                const { stream } = await me.subscribe(e.publication.id);
                 const audio = document.createElement('audio');
                 audio.srcObject = stream.track;
                 audio.autoplay = true;
                 audio.playsInline = true;
                 document.body.appendChild(audio);
-            };
-
-            room.onStreamPublished.add((e) => subscribe(e.publication));
-            room.publications.forEach(subscribe);
+            });
 
             btn.innerText = "通話中";
             dot.style.background = "#00ff00";
         } catch (e) {
-            alert(e.message);
+            alert("ボイチャ失敗: " + e.message);
             btn.disabled = false;
             btn.innerText = "入室する";
         }
