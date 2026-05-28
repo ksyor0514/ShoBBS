@@ -11,26 +11,35 @@
         body { font-family: sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; justify-content: center; min-height: 100vh; }
         .main-wrapper { width: 100%; max-width: 1000px; padding: 20px; box-sizing: border-box; }
         h1 { text-align: center; color: var(--accent); letter-spacing: 5px; }
-        .grid-layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
-        @media (min-width: 768px) { .grid-layout { grid-template-columns: 350px 1fr; } }
-        .panel { background: var(--card); border: 1px solid var(--accent); padding: 20px; border-radius: 4px; }
+        .panel { background: var(--card); border: 1px solid var(--accent); padding: 20px; border-radius: 4px; margin-bottom: 20px; }
         .vc-panel { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); padding: 15px; margin-bottom: 20px; text-align: center; }
         .status-dot { display: inline-block; width: 10px; height: 10px; background: #334155; border-radius: 50%; margin-right: 8px; }
         input, textarea { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.7); color: var(--accent); border: 1px solid #1e293b; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; }
-        button:disabled { border-color: #475569; color: #475569; cursor: not-allowed; opacity: 0.5; }
+        button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:hover { background: var(--accent); color: #000; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         .post-card { background: rgba(255, 255, 255, 0.03); padding: 15px; border-left: 3px solid var(--accent); margin-bottom: 10px; }
-        .auth-container { max-width: 400px; margin: 100px auto; }
+        .tab-link { color: var(--accent); cursor: pointer; text-decoration: underline; font-size: 0.9em; display: block; text-align: center; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div id="root" class="main-wrapper">
-    <div class="auth-container panel">
+    <div id="auth-box" class="panel" style="max-width:400px; margin: 100px auto;">
         <h1>ShoSNS</h1>
-        <input type="text" id="loginId" placeholder="ユーザーID">
-        <input type="password" id="pinCode" placeholder="PINコード">
-        <button onclick="login()">ログイン</button>
+        <div id="auth-form">
+            <input type="text" id="loginId" placeholder="ユーザーID">
+            <input type="password" id="pinCode" placeholder="PINコード">
+            <button onclick="login()">ログイン</button>
+            <span class="tab-link" onclick="toggleAuth(true)">新規登録（申請）はこちら</span>
+        </div>
+        <div id="register-form" style="display:none;">
+            <p style="font-size:0.8em; color:var(--accent);">※登録には管理者の承認が必要です</p>
+            <input type="text" id="regId" placeholder="希望ユーザーID">
+            <input type="password" id="regPin" placeholder="希望PINコード (数字4桁など)">
+            <button onclick="register()">利用申請を送る</button>
+            <span class="tab-link" onclick="toggleAuth(false)">ログインに戻る</span>
+        </div>
     </div>
 </div>
 
@@ -41,7 +50,6 @@
 <script>
     let currentUserName = "";
     let db, SkyWayContext, SkyWayRoom, SkyWayStreamFactory;
-    let isSkyWayReady = false;
 
     const appId = "e78d2560-389d-4d0e-a981-5214050d87ca";
     const firebaseConfig = {
@@ -53,36 +61,57 @@
         appId: "1:377338728077:web:1205ed292e4181869adcc4"
     };
 
-    // 初期化処理をまとめる
-    function initApp() {
+    // 初期化
+    window.onload = () => {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        
-        // SkyWayの存在確認
-        if (window.skyway_sdk_core) {
-            SkyWayContext = skyway_sdk_core.SkyWayContext;
-            SkyWayRoom = skyway_sdk_core.SkyWayRoom;
-            SkyWayStreamFactory = skyway_sdk_core.SkyWayStreamFactory;
-            isSkyWayReady = true;
-            console.log("SkyWay Ready!");
-        } else {
-            setTimeout(initApp, 500); // まだなら0.5秒後に再試行
-        }
+        // SkyWay SDKの読み込み待機
+        const checkSkyWay = setInterval(() => {
+            if (window.skyway_sdk_core) {
+                SkyWayContext = skyway_sdk_core.SkyWayContext;
+                SkyWayRoom = skyway_sdk_core.SkyWayRoom;
+                SkyWayStreamFactory = skyway_sdk_core.SkyWayStreamFactory;
+                clearInterval(checkSkyWay);
+                console.log("SkyWay Ready");
+            }
+        }, 500);
+    };
+
+    function toggleAuth(isReg) {
+        document.getElementById('auth-form').style.display = isReg ? 'none' : 'block';
+        document.getElementById('register-form').style.display = isReg ? 'block' : 'none';
     }
-    initApp();
+
+    // --- 新規登録機能 ---
+    async function register() {
+        const id = document.getElementById('regId').value.trim();
+        const pin = document.getElementById('regPin').value.trim();
+        if(!id || !pin) return alert("入力してね");
+        
+        try {
+            await db.collection("requests").add({
+                userId: id,
+                pin: pin,
+                isApproved: false, // 最初は未承認
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            alert("申請を送りました！管理者が承認するまで待ってね。");
+            toggleAuth(false);
+        } catch (e) { alert("申請エラー"); }
+    }
 
     async function login() {
         const id = document.getElementById('loginId').value;
         const pin = document.getElementById('pinCode').value;
         try {
             const snapshot = await db.collection("requests").where("userId", "==", id).get();
-            if (snapshot.empty) return alert("ユーザーなし");
+            if (snapshot.empty) return alert("ユーザーがいないか、承認待ちです");
             const data = snapshot.docs[0].data();
             if (data.pin == pin && data.isApproved) {
                 currentUserName = id;
                 showMainPage();
-            } else { alert("認証失敗"); }
-        } catch (e) { alert("ログインエラー"); }
+            } else { alert("PINが違うか、まだ承認されていません"); }
+        } catch (e) { alert("エラー"); }
     }
 
     function showMainPage() {
@@ -103,23 +132,18 @@
         loadPosts();
     }
 
+    // --- ボイチャ強化版 ---
     async function joinVC() {
-        if (!isSkyWayReady || !SkyWayContext) {
-            alert("通信システムの準備中です。数秒待ってからもう一度押してね！");
-            return;
-        }
-
+        if (!SkyWayContext) return alert("通信準備中...あと5秒待って");
         const btn = document.getElementById('joinBtn');
         const dot = document.getElementById('vc-dot');
         btn.disabled = true;
         btn.innerText = "接続中...";
 
         try {
+            const audioStream = await SkyWayStreamFactory.createMicrophoneAudioStream();
             const context = await SkyWayContext.Create(appId);
             const room = await SkyWayRoom.FindOrCreate(context, { type: 'p2p', name: 'ShoRoom' });
-            
-            // マイク取得（ユーザー操作直後なので通りやすい）
-            const audioStream = await SkyWayStreamFactory.createMicrophoneAudioStream();
             const me = await room.join();
             await me.publish(audioStream);
 
@@ -137,9 +161,9 @@
             dot.style.background = "#00ff00";
         } catch (e) {
             console.error(e);
-            alert("ボイチャ接続に失敗しました。マイク許可を確認してね！");
+            alert("失敗！原因: " + e.message);
             btn.disabled = false;
-            btn.innerText = "入室する";
+            btn.innerText = "再試行";
         }
     }
 
