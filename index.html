@@ -9,35 +9,26 @@
         body { background: var(--bg); font-family: "MS PGothic", sans-serif; padding: 10px; margin: 0; }
         .container { max-width: 900px; margin: 0 auto; background: var(--w-bg); border: 2px solid var(--border); min-height: 100vh; padding: 15px; }
         h1 { color: #f00; text-align: center; font-size: 1.4em; }
-        
-        /* スレッド一覧 */
         .thread-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--link); }
-        .thread-item:hover { background: #f9f9f9; text-decoration: underline; }
-        
-        /* 書き込み/スレ立てフォーム */
         .form-area { background: #f0f0f0; border: 1px solid var(--border); padding: 15px; margin: 20px 0; }
-        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 5px; }
-        
-        /* レス表示 */
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 10px; }
         .post { border-bottom: 1px dashed var(--border); padding: 10px 0; }
         .post-info { color: #228b22; font-size: 0.9em; font-weight: bold; }
-        .post-body { margin-top: 5px; white-space: pre-wrap; }
-        
-        .nav-bar { margin-bottom: 10px; }
-        .btn { background: #eee; border: 1px solid #999; cursor: pointer; padding: 3px 10px; }
+        .btn { background: #eee; border: 1px solid #999; cursor: pointer; padding: 5px 15px; margin: 5px 0; }
     </style>
 </head>
 <body>
 
 <div id="root" class="container">
-    </div>
+    <h1>読み込み中...</h1>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
     let currentUserName = "";
-    let currentThreadId = null; // どのスレッドを見ているか
+    let currentThreadId = null;
     let db;
 
     const firebaseConfig = {
@@ -50,12 +41,15 @@
     };
 
     window.onload = () => {
-        firebase.initializeApp(firebaseConfig);
-        db = firebase.firestore();
-        showLoginPage();
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            showLoginPage();
+        } catch (e) {
+            document.getElementById('root').innerHTML = "<h1>初期化エラー。設定を確認してね</h1>";
+        }
     };
 
-    // --- ログイン/登録画面 ---
     function showLoginPage() {
         document.getElementById('root').innerHTML = `
             <h1>ShoBBS - ログイン</h1>
@@ -85,21 +79,21 @@
     async function register() {
         const id = document.getElementById('regId').value;
         const pin = document.getElementById('regPin').value;
+        if(!id || !pin) return alert("入力して");
         await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         alert("申請完了");
     }
 
-    // --- スレッド一覧画面 ---
     function showThreadList() {
         currentThreadId = null;
         document.getElementById('root').innerHTML = `
             <h1>ShoBBS - スレッド一覧</h1>
-            <div class="nav-bar"><button class="btn" onclick="location.reload()">ログアウト</button></div>
-            <div id="list-area">読み込み中...</div>
+            <button class="btn" onclick="location.reload()">ログアウト</button>
+            <div id="list-area">スレッドを取得中...</div>
             <div class="form-area">
                 <b>新規スレッド作成</b>
-                <input type="text" id="newThreadTitle" placeholder="スレッドタイトル">
-                <textarea id="firstPost" placeholder="最初の書き込み"></textarea>
+                <input type="text" id="newThreadTitle" placeholder="タイトル">
+                <textarea id="firstPost" placeholder="本文"></textarea>
                 <button class="btn" onclick="createThread()">スレッドを立てる</button>
             </div>
         `;
@@ -107,6 +101,7 @@
         db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
             const area = document.getElementById('list-area');
             if(!area || currentThreadId) return;
+            if(ss.empty) { area.innerHTML = "スレッドがまだありません。"; return; }
             area.innerHTML = "";
             ss.forEach(doc => {
                 const t = doc.data();
@@ -116,39 +111,38 @@
                 div.onclick = () => showThreadDetail(doc.id, t.title);
                 area.appendChild(div);
             });
+        }, err => {
+            console.error(err);
+            document.getElementById('list-area').innerHTML = "エラー：Firestoreのルールを確認してください。";
         });
     }
 
-    // --- スレッド作成 ---
     async function createThread() {
         const title = document.getElementById('newThreadTitle').value;
         const text = document.getElementById('firstPost').value;
         if(!title || !text) return alert("全部入力して");
-
-        const threadRef = await db.collection("threads").add({
-            title: title,
-            creator: currentUserName,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        // 最初の1レス目も保存
-        await db.collection("posts").add({
-            threadId: threadRef.id,
-            user: currentUserName,
-            text: text,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        showThreadDetail(threadRef.id, title);
+        try {
+            const threadRef = await db.collection("threads").add({
+                title: title,
+                creator: currentUserName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            await db.collection("posts").add({
+                threadId: threadRef.id,
+                user: currentUserName,
+                text: text,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showThreadDetail(threadRef.id, title);
+        } catch(e) { alert("作成エラー: " + e.message); }
     }
 
-    // --- スレッド詳細（レス一覧） ---
     function showThreadDetail(id, title) {
         currentThreadId = id;
         document.getElementById('root').innerHTML = `
-            <div class="nav-bar"><button class="btn" onclick="showThreadList()">一覧に戻る</button></div>
+            <button class="btn" onclick="showThreadList()">一覧に戻る</button>
             <h1>${title}</h1>
-            <div id="post-area">読み込み中...</div>
+            <div id="post-area">レスを取得中...</div>
             <div class="form-area">
                 <b>レスを書く</b>
                 <textarea id="replyText" rows="4"></textarea>
@@ -163,12 +157,7 @@
             let count = 1;
             ss.forEach(doc => {
                 const p = doc.data();
-                area.innerHTML += `
-                    <div class="post">
-                        <div class="post-info">${count} ：${p.user}</div>
-                        <div class="post-body">${p.text}</div>
-                    </div>
-                `;
+                area.innerHTML += `<div class="post"><div class="post-info">${count} ：${p.user}</div><div class="post-body">${p.text}</div></div>`;
                 count++;
             });
         });
@@ -177,13 +166,15 @@
     async function sendReply() {
         const text = document.getElementById('replyText').value;
         if(!text.trim()) return;
-        await db.collection("posts").add({
-            threadId: currentThreadId,
-            user: currentUserName,
-            text: text,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        document.getElementById('replyText').value = "";
+        try {
+            await db.collection("posts").add({
+                threadId: currentThreadId,
+                user: currentUserName,
+                text: text,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            document.getElementById('replyText').value = "";
+        } catch(e) { alert("書き込みエラー"); }
     }
 </script>
 </body>
