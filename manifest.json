@@ -1,5 +1,5 @@
 <script>
-    // --- 1. 変数の宣言は一番最初にまとめる！ ---
+    // 1. 定数とSDKの準備（一番最初にやる）
     const appId = "e78d2560-389d-4d0e-a981-5214050d87ca";
     const firebaseConfig = {
         apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
@@ -10,18 +10,20 @@
         appId: "1:377338728077:web:1205ed292e4181869adcc4"
     };
 
-    // Firebase初期化
+    // 初期化
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const { SkyWayContext, SkyWayRoom, SkyWayStreamFactory } = skyway_sdk_core;
 
-    // ここが大事！エラーの原因はこいつの位置
-    let currentUserName = "Guest"; 
+    // 2. グローバル変数の宣言（関数の外に置く）
+    let currentUserName = "Guest";
 
-    // --- 2. ログイン関数 ---
+    // 3. 各機能の関数定義
     async function login() {
         const idInput = document.getElementById('loginId');
         const pinInput = document.getElementById('pinCode');
+        if (!idInput || !pinInput) return;
+
         const id = idInput.value;
         const pin = pinInput.value;
         
@@ -30,9 +32,8 @@
             if (snapshot.empty) return alert("ユーザーが見つかりません");
             
             const data = snapshot.docs[0].data();
-            // PINの型が違っても通るように == を使う
             if (data.pin == pin && data.isApproved) {
-                currentUserName = id; // ここで名前を上書き！
+                currentUserName = id; // ここでログインユーザー名を保存
                 showMainPage(id);
             } else {
                 alert("PINが違うか、承認されていません");
@@ -42,24 +43,30 @@
         }
     }
 
-    // --- 3. 投稿関数（ここも修正） ---
     async function sendPost() {
         const textInput = document.getElementById('postInput');
+        if (!textInput) return;
+
         const text = textInput.value;
         if(!text.trim()) return;
 
-        // currentUserName が空っぽにならないようにチェック
-        if(!currentUserName) {
-            alert("再ログインしてください");
-            return;
+        try {
+            await db.collection("posts").add({ 
+                user: currentUserName, 
+                text: text, 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp() 
+            });
+            textInput.value = "";
+        } catch (e) {
+            alert("投稿エラー: " + e.message);
         }
-
-        await db.collection("posts").add({ 
-            user: currentUserName, 
-            text: text, 
-            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-        });
-        textInput.value = "";
     }
 
-    // ... 残りの showMainPage や joinVC はそのままでOK ...
+    function showMainPage(username) {
+        const root = document.getElementById('root');
+        if (!root) return;
+
+        root.innerHTML = `
+            <h1>ShoSNS</h1>
+            <div class="grid-layout">
+                <div class
