@@ -3,18 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ShoBBS 2.0</title>
+    <title>ShoBBS Dark</title>
     <style>
-        :root { --bg: #efefef; --w-bg: #fff; --border: #ccc; --link: #0000ff; }
-        body { background: var(--bg); font-family: "MS PGothic", sans-serif; padding: 10px; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; background: var(--w-bg); border: 2px solid var(--border); min-height: 100vh; padding: 15px; }
-        h1 { color: #f00; text-align: center; font-size: 1.4em; }
-        .thread-item { padding: 10px; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--link); }
-        .form-area { background: #f0f0f0; border: 1px solid var(--border); padding: 15px; margin: 20px 0; }
-        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 5px; padding: 10px; }
-        .post { border-bottom: 1px dashed var(--border); padding: 10px 0; }
-        .post-info { color: #228b22; font-size: 0.9em; font-weight: bold; }
-        .btn { background: #eee; border: 1px solid #999; cursor: pointer; padding: 5px 15px; margin: 5px 0; }
+        /* ダークモード用のカラー設定 */
+        :root { 
+            --bg: #121212;        /* 背景：真っ黒に近いグレー */
+            --w-bg: #1e1e1e;      /* コンテンツ背景：少し明るいグレー */
+            --border: #333;       /* 枠線 */
+            --text: #e0e0e0;      /* 文字：薄い白 */
+            --link: #4da6ff;      /* リンク：明るい青 */
+            --info: #7cfc00;      /* 名前：黄緑 */
+            --accent: #ff4500;    /* タイトル：オレンジレッド */
+        }
+        body { background: var(--bg); color: var(--text); font-family: "MS PGothic", sans-serif; padding: 10px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--w-bg); border: 1px solid var(--border); min-height: 100vh; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        h1 { color: var(--accent); text-align: center; font-size: 1.4em; text-shadow: 1px 1px 2px #000; }
+        
+        /* スレッド一覧 */
+        .thread-item { padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer; color: var(--link); }
+        .thread-item:hover { background: #2a2a2a; }
+        
+        /* フォームエリア */
+        .form-area { background: #252525; border: 1px solid var(--border); padding: 15px; margin: 20px 0; border-radius: 5px; }
+        input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 10px; padding: 12px; background: #121212; border: 1px solid var(--border); color: #fff; border-radius: 4px; }
+        input:focus, textarea:focus { border-color: var(--link); outline: none; }
+        
+        /* レス表示 */
+        .post { border-bottom: 1px solid var(--border); padding: 15px 0; }
+        .post-info { color: var(--info); font-size: 0.9em; font-weight: bold; margin-bottom: 5px; }
+        .post-body { white-space: pre-wrap; line-height: 1.6; color: var(--text); }
+        
+        .btn { background: #333; border: 1px solid #555; color: #fff; cursor: pointer; padding: 8px 20px; border-radius: 4px; transition: 0.2s; }
+        .btn:hover { background: #444; border-color: #777; }
+        hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
     </style>
 </head>
 <body>
@@ -46,15 +67,19 @@
 
     function showLoginPage() {
         document.getElementById('root').innerHTML = `
-            <h1>ShoBBS - ログイン</h1>
-            <input type="text" id="loginId" placeholder="ID">
-            <input type="password" id="pinCode" placeholder="PIN">
-            <button class="btn" onclick="login()">ログイン</button>
+            <h1>ShoBBS - LOGIN</h1>
+            <div class="form-area">
+                <input type="text" id="loginId" placeholder="USER ID">
+                <input type="password" id="pinCode" placeholder="PIN CODE">
+                <button class="btn" onclick="login()">ログイン</button>
+            </div>
             <hr>
-            <p>新規申請</p>
-            <input type="text" id="regId" placeholder="希望ID">
-            <input type="password" id="regPin" placeholder="希望PIN">
-            <button class="btn" onclick="register()">申請</button>
+            <div class="form-area">
+                <p style="margin-top:0;">新規利用申請</p>
+                <input type="text" id="regId" placeholder="希望ID">
+                <input type="password" id="regPin" placeholder="希望PIN">
+                <button class="btn" onclick="register()">申請を送る</button>
+            </div>
         `;
     }
 
@@ -73,6 +98,7 @@
     async function register() {
         const id = document.getElementById('regId').value;
         const pin = document.getElementById('regPin').value;
+        if(!id || !pin) return;
         await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         alert("申請完了");
     }
@@ -80,17 +106,17 @@
     function showThreadList() {
         currentThreadId = null;
         document.getElementById('root').innerHTML = `
-            <h1>ShoBBS - スレッド一覧</h1>
-            <button class="btn" onclick="location.reload()">ログアウト</button>
+            <h1>THREADS</h1>
+            <div style="text-align:right;"><button class="btn" onclick="location.reload()">LOGOUT</button></div>
             <div id="list-area">取得中...</div>
             <div class="form-area">
-                <b>新規スレッド作成</b>
+                <b>新スレを立てる</b>
                 <input type="text" id="newThreadTitle" placeholder="タイトル">
-                <textarea id="firstPost" placeholder="本文"></textarea>
-                <button class="btn" onclick="createThread()">スレッドを立てる</button>
+                <textarea id="firstPost" placeholder="１個目の書き込み" rows="3"></textarea>
+                <button class="btn" onclick="createThread()">スレッド作成</button>
             </div>
         `;
-        // スレッド一覧はorderByを残してもエラーになりにくいのでそのまま
+        
         db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
             const area = document.getElementById('list-area');
             if(!area || currentThreadId) return;
@@ -122,16 +148,16 @@
     function showThreadDetail(id, title) {
         currentThreadId = id;
         document.getElementById('root').innerHTML = `
-            <button class="btn" onclick="showThreadList()">一覧に戻る</button>
+            <div style="margin-bottom:10px;"><button class="btn" onclick="showThreadList()">← 戻る</button></div>
             <h1>${title}</h1>
             <div id="post-area"></div>
             <div class="form-area">
-                <textarea id="replyText" rows="4"></textarea>
+                <b>レスを書く</b>
+                <textarea id="replyText" rows="5"></textarea>
                 <button class="btn" onclick="sendReply()">書き込む</button>
             </div>
         `;
 
-        // ★ここを修正！ orderByを削除してインデックスエラーを回避しました
         db.collection("posts").where("threadId", "==", id).onSnapshot(ss => {
             const area = document.getElementById('post-area');
             if(!area) return;
@@ -139,7 +165,12 @@
             let count = 1;
             ss.forEach(doc => {
                 const p = doc.data();
-                area.innerHTML += `<div class="post"><div class="post-info">${count} ：${p.user}</div><div class="post-body">${p.text}</div></div>`;
+                area.innerHTML += `
+                    <div class="post">
+                        <div class="post-info">${count} ：${p.user}</div>
+                        <div class="post-body">${p.text}</div>
+                    </div>
+                `;
                 count++;
             });
         });
