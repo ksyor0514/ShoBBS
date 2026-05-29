@@ -4,22 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ShoBBS</title>
-
     <link rel="apple-touch-icon" href="https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg">
     <link rel="icon" href="https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="ShoBBS">
-
     <style>
-        :root { 
-            --bg: #0a0f1a; 
-            --card: #111827; 
-            --accent: #22d3ee; 
-            --text: #cbd5e1; 
-            --border: rgba(34, 211, 238, 0.2);
-            --sub-text: #94a3b8;
-            --admin-color: #f87171;
-        }
+        :root { --bg: #0a0f1a; --card: #111827; --accent: #22d3ee; --text: #cbd5e1; --border: rgba(34, 211, 238, 0.2); --sub-text: #94a3b8; --admin-color: #f87171; }
         body { background-color: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; line-height: 1.5; }
         .container { width: 100%; max-width: 700px; background: var(--card); border: 1px solid var(--border); min-height: 90vh; padding: 24px; box-sizing: border-box; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         h1 { text-align: center; color: var(--accent); letter-spacing: 4px; margin-bottom: 24px; font-size: 1.8em; }
@@ -40,21 +30,20 @@
     </style>
 </head>
 <body>
-
 <div id="root" class="container"></div>
-
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.21.0.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
 <script>
     const AGORA_APP_ID = "1563871745f642a5a5332fe7ee3ebeba"; 
-    // ★ ここを管理者のID「admin」に固定したよ
     const ADMIN_USER_ID = "admin"; 
-    
     let currentUserName = "";
     let currentThreadId = null;
     let db, client, localAudioTrack;
+    
+    // 【重要】監視を解除するための変数
+    let unsubscribeThreads = null;
+    let unsubscribePosts = null;
 
     const firebaseConfig = {
         apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
@@ -73,19 +62,7 @@
     };
 
     function showLoginPage() {
-        document.getElementById('root').innerHTML = `
-            <h1>ShoBBS</h1>
-            <div class="form-area">
-                <input type="text" id="loginId" placeholder="ユーザーID">
-                <input type="password" id="pinCode" placeholder="PINコード">
-                <button onclick="login()">ログイン</button>
-            </div>
-            <div style="text-align:center;">
-                <input type="text" id="regId" placeholder="新規ID">
-                <input type="password" id="regPin" placeholder="新規PIN">
-                <button onclick="register()" class="btn-small">利用申請を送る</button>
-            </div>
-        `;
+        document.getElementById('root').innerHTML = `<h1>ShoBBS</h1><div class="form-area"><input type="text" id="loginId" placeholder="ユーザーID"><input type="password" id="pinCode" placeholder="PINコード"><button onclick="login()">ログイン</button></div><div style="text-align:center;"><input type="text" id="regId" placeholder="新規ID"><input type="password" id="regPin" placeholder="新規PIN"><button onclick="register()" class="btn-small">利用申請を送る</button></div>`;
     }
 
     async function login() {
@@ -94,50 +71,30 @@
         const snap = await db.collection("requests").where("userId", "==", id).get();
         if (snap.empty) return alert("登録がありません");
         const data = snap.docs[0].data();
-        // PINの一致チェックと承認済みかチェック
-        if (data.pin == pin && data.isApproved) {
-            currentUserName = id;
-            showThreadList();
-        } else { 
-            alert("認証待ち または PIN違い"); 
-        }
+        if (data.pin == pin && data.isApproved) { currentUserName = id; showThreadList(); } else { alert("認証待ち または PIN違い"); }
     }
 
     async function register() {
         const id = document.getElementById('regId').value;
         const pin = document.getElementById('regPin').value;
         if(!id || !pin) return;
-        await db.collection("requests").add({ 
-            userId: id, 
-            pin: pin, 
-            isApproved: false, 
-            createdAt: firebase.firestore.FieldValue.serverTimestamp() 
-        });
+        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         alert("申請しました。adminの承認を待ってください。");
     }
 
     function showThreadList() {
+        // 前の監視を止める
+        if(unsubscribeThreads) unsubscribeThreads();
+        if(unsubscribePosts) unsubscribePosts();
+        
         currentThreadId = null;
         leaveCall();
-        // ログイン中のIDが「admin」の時だけボタンを出す
         let adminBtn = (currentUserName === ADMIN_USER_ID) ? `<button class="btn-small admin-btn" onclick="showAdminPage()">管理画面</button>` : "";
+        document.getElementById('root').innerHTML = `<div class="nav">${adminBtn}<button class="btn-small" onclick="location.reload()">ログアウト</button></div><h1>ShoBBS</h1><div class="form-area"><input type="text" id="newThreadTitle" placeholder="スレタイ"><textarea id="firstPost" placeholder="本文"></textarea><button onclick="createThread()">新規スレッド</button></div><div id="list-area">更新中...</div>`;
         
-        document.getElementById('root').innerHTML = `
-            <div class="nav">
-                ${adminBtn}
-                <button class="btn-small" onclick="location.reload()">ログアウト</button>
-            </div>
-            <h1>ShoBBS</h1>
-            <div class="form-area">
-                <input type="text" id="newThreadTitle" placeholder="スレタイ">
-                <textarea id="firstPost" placeholder="本文"></textarea>
-                <button onclick="createThread()">新規スレッド</button>
-            </div>
-            <div id="list-area">更新中...</div>
-        `;
-        db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
+        unsubscribeThreads = db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
             const area = document.getElementById('list-area');
-            if(!area || currentThreadId) return;
+            if(!area) return;
             area.innerHTML = "";
             ss.forEach(doc => {
                 area.innerHTML += `<div class="thread-item" onclick="showThreadDetail('${doc.id}', '${doc.data().title.replace(/'/g, "\\'")}')">${doc.data().title}</div>`;
@@ -145,24 +102,38 @@
         });
     }
 
+    function showThreadDetail(id, title) {
+        // スレッド一覧の監視を止める
+        if(unsubscribeThreads) unsubscribeThreads();
+        if(unsubscribePosts) unsubscribePosts();
+
+        currentThreadId = id;
+        document.getElementById('root').innerHTML = `<div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div><h1 style="font-size:1.2em; border:none;">${title}</h1><div id="call-status">未接続</div><div style="display:flex; gap:10px; margin-bottom:20px;"><button id="join-btn" onclick="joinCall('${id}')">通話開始</button><button id="leave-btn" style="display:none; border-color:#f87171; color:#f87171;" onclick="leaveCall()">終了</button></div><div class="form-area"><textarea id="replyText" rows="3" placeholder="コメントを書く"></textarea><button onclick="sendReply()">書き込む</button></div><div id="post-area"></div>`;
+
+        unsubscribePosts = db.collection("posts").where("threadId", "==", id).onSnapshot(ss => {
+            const area = document.getElementById('post-area');
+            if(!area) return;
+            let posts = [];
+            ss.forEach(doc => posts.push(doc.data()));
+            posts.sort((a, b) => (b.createdAt?.toMillis() || Date.now()) - (a.createdAt?.toMillis() || Date.now()));
+            area.innerHTML = "";
+            posts.forEach(p => {
+                area.innerHTML += `<div class="post"><div class="post-info">${p.user}</div><div class="post-body">${p.text}</div></div>`;
+            });
+        });
+    }
+
     async function showAdminPage() {
-        document.getElementById('root').innerHTML = `
-            <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
-            <h1>ユーザー承認</h1>
-            <div id="admin-list" class="form-area">読み込み中...</div>
-        `;
-        
+        if(unsubscribeThreads) unsubscribeThreads();
+        if(unsubscribePosts) unsubscribePosts();
+        document.getElementById('root').innerHTML = `<div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div><h1>ユーザー承認</h1><div id="admin-list" class="form-area">読み込み中...</div>`;
         db.collection("requests").where("isApproved", "==", false).onSnapshot(ss => {
             const area = document.getElementById('admin-list');
             if(!area) return;
             if(ss.empty) { area.innerHTML = "未承認のユーザーはいません。"; return; }
             area.innerHTML = "";
             ss.forEach(doc => {
-                area.innerHTML += `
-                    <div class="req-item">
-                        <span>ID: <b>${doc.data().userId}</b></span>
-                        <button class="btn-small" onclick="approveUser('${doc.id}')">承認する</button>
-                    </div>`;
+                area.innerHTML += `<div class="req-item"><span>ID: <b>${doc.data().userId}</b></span><button class="btn-small" onclick="approveUser('${doc.id}')">承認する</button></div>`;
             });
         });
     }
@@ -180,40 +151,6 @@
         const threadRef = await db.collection("threads").add({ title, creator: currentUserName, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         await db.collection("posts").add({ threadId: threadRef.id, user: currentUserName, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         showThreadDetail(threadRef.id, title);
-    }
-
-    function showThreadDetail(id, title) {
-        currentThreadId = id;
-        document.getElementById('root').innerHTML = `
-            <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
-            <h1 style="font-size:1.2em; border:none;">${title}</h1>
-            <div id="call-status">未接続</div>
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <button id="join-btn" onclick="joinCall('${id}')">通話開始</button>
-                <button id="leave-btn" style="display:none; border-color:#f87171; color:#f87171;" onclick="leaveCall()">終了</button>
-            </div>
-            <div class="form-area">
-                <textarea id="replyText" rows="3" placeholder="コメントを書く"></textarea>
-                <button onclick="sendReply()">書き込む</button>
-            </div>
-            <div id="post-area"></div>
-        `;
-
-        db.collection("posts").where("threadId", "==", id).onSnapshot(ss => {
-            const area = document.getElementById('post-area');
-            if(!area) return;
-            let posts = [];
-            ss.forEach(doc => posts.push(doc.data()));
-            posts.sort((a, b) => (b.createdAt?.toMillis() || Date.now()) - (a.createdAt?.toMillis() || Date.now()));
-            area.innerHTML = "";
-            posts.forEach(p => {
-                area.innerHTML += `
-                    <div class="post">
-                        <div class="post-info">${p.user}</div>
-                        <div class="post-body">${p.text}</div>
-                    </div>`;
-            });
-        });
     }
 
     async function joinCall(channelId) {
