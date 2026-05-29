@@ -12,27 +12,119 @@
 
     <style>
         :root { 
-            --bg: radial-gradient(circle at center, #0f172a 0%, #020617 100%); 
-            --card: rgba(15, 23, 42, 0.8); 
-            --accent: #00f2ff; 
-            --text: #e2e8f0; 
-            --border: rgba(0, 242, 255, 0.3);
+            /* 背景を少し柔らかい紺色に、アクセントを落ち着いたシアンに */
+            --bg: #0a0f1a; 
+            --card: #111827; 
+            --accent: #22d3ee; 
+            --text: #cbd5e1; 
+            --border: rgba(34, 211, 238, 0.2);
+            --sub-text: #94a3b8;
         }
-        body { background: var(--bg); background-attachment: fixed; color: var(--text); font-family: sans-serif; margin: 0; padding: 10px; display: flex; justify-content: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 800px; background: var(--card); border: 1px solid var(--border); backdrop-filter: blur(10px); min-height: 95vh; padding: 20px; box-sizing: border-box; border-radius: 8px; }
-        h1 { text-align: center; color: var(--accent); letter-spacing: 5px; border-bottom: 1px solid var(--border); padding-bottom: 15px; font-size: 2em; text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); }
-        .thread-item { padding: 15px; border: 1px solid var(--border); margin-bottom: 12px; cursor: pointer; transition: 0.3s; background: rgba(255,255,255,0.02); border-radius: 4px; }
-        .thread-item:hover { border-color: var(--accent); background: rgba(0, 242, 255, 0.1); }
-        .form-area { background: rgba(0,0,0,0.4); border: 1px solid var(--border); padding: 20px; margin: 20px 0; border-radius: 4px; }
-        input, textarea { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid var(--border); box-sizing: border-box; border-radius: 4px; font-size: 16px; }
-        button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        button:hover { background: var(--accent); color: #020617; }
-        .post { border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 20px; background: rgba(255,255,255,0.03); display: flex; gap: 15px; align-items: flex-start; }
-        .user-icon { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover; background: #000; flex-shrink: 0; }
-        .post-content { flex-grow: 1; }
+        body { 
+            background-color: var(--bg); 
+            color: var(--text); 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 15px; 
+            display: flex; 
+            justify-content: center; 
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        .container { 
+            width: 100%; 
+            max-width: 700px; 
+            background: var(--card); 
+            border: 1px solid var(--border); 
+            min-height: 90vh; 
+            padding: 24px; 
+            box-sizing: border-box; 
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 { 
+            text-align: center; 
+            color: var(--accent); 
+            letter-spacing: 4px; 
+            margin-bottom: 24px;
+            font-size: 1.8em;
+            text-transform: uppercase;
+        }
+        .thread-item { 
+            padding: 18px; 
+            border: 1px solid var(--border); 
+            margin-bottom: 12px; 
+            cursor: pointer; 
+            transition: all 0.2s ease; 
+            background: rgba(255,255,255,0.02); 
+            border-radius: 8px; 
+        }
+        .thread-item:hover { 
+            border-color: var(--accent); 
+            background: rgba(34, 211, 238, 0.05);
+            transform: translateY(-2px);
+        }
+        .form-area { 
+            background: rgba(0,0,0,0.2); 
+            border: 1px solid var(--border); 
+            padding: 18px; 
+            margin-bottom: 24px; 
+            border-radius: 8px; 
+        }
+        input, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 8px 0; 
+            background: #0f172a; 
+            color: #fff; 
+            border: 1px solid #334155; 
+            box-sizing: border-box; 
+            border-radius: 6px; 
+            font-size: 16px;
+            outline: none;
+        }
+        input:focus, textarea:focus { border-color: var(--accent); }
+        button { 
+            width: 100%; 
+            padding: 12px; 
+            background: var(--accent); 
+            color: #0891b2; 
+            border: none;
+            border-radius: 6px;
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: 0.2s; 
+            margin-top: 8px;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+        }
+        button:hover { 
+            background: var(--accent); 
+            color: #0f172a; 
+        }
+        .post { 
+            border-left: 3px solid var(--accent); 
+            padding: 12px 16px; 
+            margin-bottom: 16px; 
+            background: rgba(255,255,255,0.03);
+            border-radius: 0 8px 8px 0;
+        }
+        .post-info { color: var(--sub-text); font-size: 0.8em; margin-bottom: 6px; }
+        .post-body { color: var(--text); font-size: 1rem; word-break: break-all; }
+        
         .nav { display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 10px; }
-        .btn-small { width: auto; padding: 5px 10px; font-size: 0.8em; margin: 0; }
-        #call-status { margin: 10px 0; padding: 10px; background: rgba(0, 242, 255, 0.1); border-radius: 4px; font-size: 0.9em; text-align: center; display: none; color: var(--accent); }
+        .btn-small { width: auto; padding: 6px 12px; font-size: 0.75em; margin: 0; }
+        #call-status { 
+            margin-bottom: 15px; 
+            padding: 8px; 
+            background: rgba(34, 211, 238, 0.1); 
+            border-radius: 6px; 
+            font-size: 0.85em; 
+            text-align: center; 
+            display: none; 
+            color: var(--accent); 
+        }
     </style>
 </head>
 <body>
@@ -46,7 +138,6 @@
 <script>
     const AGORA_APP_ID = "1563871745f642a5a5332fe7ee3ebeba"; 
     let currentUserName = "";
-    let currentUserIcon = "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg"; // アイコン初期値もこれに
     let currentThreadId = null;
     let db, client, localAudioTrack;
 
@@ -72,12 +163,12 @@
             <div class="form-area">
                 <input type="text" id="loginId" placeholder="ユーザーID">
                 <input type="password" id="pinCode" placeholder="PINコード">
-                <button onclick="login()">アクセス開始</button>
+                <button onclick="login()">ログイン</button>
             </div>
-            <div style="text-align:center; margin-top:20px;">
-                <input type="text" id="regId" placeholder="希望ID">
-                <input type="password" id="regPin" placeholder="希望PIN">
-                <button onclick="register()" class="btn-small">利用申請</button>
+            <div style="text-align:center;">
+                <input type="text" id="regId" placeholder="新規ID">
+                <input type="password" id="regPin" placeholder="新規PIN">
+                <button onclick="register()" class="btn-small">利用申請を送る</button>
             </div>
         `;
     }
@@ -86,20 +177,20 @@
         const id = document.getElementById('loginId').value;
         const pin = document.getElementById('pinCode').value;
         const snap = await db.collection("requests").where("userId", "==", id).get();
-        if (snap.empty) return alert("ユーザーなし");
+        if (snap.empty) return alert("登録がありません");
         const data = snap.docs[0].data();
         if (data.pin == pin && data.isApproved) {
             currentUserName = id;
-            currentUserIcon = data.iconUrl || currentUserIcon;
             showThreadList();
-        } else { alert("認証失敗"); }
+        } else { alert("認証待ち または PIN違い"); }
     }
 
     async function register() {
         const id = document.getElementById('regId').value;
         const pin = document.getElementById('regPin').value;
-        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, iconUrl: "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        alert("申請完了");
+        if(!id || !pin) return;
+        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert("申請しました");
     }
 
     function showThreadList() {
@@ -107,48 +198,24 @@
         leaveCall();
         document.getElementById('root').innerHTML = `
             <div class="nav">
-                <button class="btn-small" onclick="showProfilePage()">プロフィール設定</button>
                 <button class="btn-small" onclick="location.reload()">ログアウト</button>
             </div>
             <h1>ShoBBS</h1>
             <div class="form-area">
                 <input type="text" id="newThreadTitle" placeholder="スレタイ">
                 <textarea id="firstPost" placeholder="本文"></textarea>
-                <button onclick="createThread()">スレ作成</button>
+                <button onclick="createThread()">新規スレッド</button>
             </div>
-            <div id="list-area">同期中...</div>
+            <div id="list-area">更新中...</div>
         `;
         db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
             const area = document.getElementById('list-area');
             if(!area || currentThreadId) return;
             area.innerHTML = "";
             ss.forEach(doc => {
-                area.innerHTML += `<div class="thread-item" onclick="showThreadDetail('${doc.id}', '${doc.data().title.replace(/'/g, "\\'")}')">■ ${doc.data().title}</div>`;
+                area.innerHTML += `<div class="thread-item" onclick="showThreadDetail('${doc.id}', '${doc.data().title.replace(/'/g, "\\'")}')">${doc.data().title}</div>`;
             });
         });
-    }
-
-    function showProfilePage() {
-        document.getElementById('root').innerHTML = `
-            <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
-            <h1>プロフィール設定</h1>
-            <div class="form-area" style="text-align:center;">
-                <img src="${currentUserIcon}" class="user-icon" style="width:100px; height:100px; margin-bottom:10px;">
-                <input type="text" id="newIconUrl" placeholder="アイコン画像のURLを入力" value="${currentUserIcon}">
-                <button onclick="updateProfile()">保存する</button>
-            </div>
-        `;
-    }
-
-    async function updateProfile() {
-        const url = document.getElementById('newIconUrl').value;
-        const snap = await db.collection("requests").where("userId", "==", currentUserName).get();
-        if (!snap.empty) {
-            await snap.docs[0].ref.update({ iconUrl: url });
-            currentUserIcon = url;
-            alert("保存しました！");
-            showThreadList();
-        }
     }
 
     async function createThread() {
@@ -156,7 +223,7 @@
         const text = document.getElementById('firstPost').value;
         if(!title || !text) return;
         const threadRef = await db.collection("threads").add({ title, creator: currentUserName, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        await db.collection("posts").add({ threadId: threadRef.id, user: currentUserName, icon: currentUserIcon, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await db.collection("posts").add({ threadId: threadRef.id, user: currentUserName, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         showThreadDetail(threadRef.id, title);
     }
 
@@ -164,13 +231,15 @@
         currentThreadId = id;
         document.getElementById('root').innerHTML = `
             <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
-            <h1>ShoBBS</h1>
+            <h1 style="font-size:1.2em; border:none;">${title}</h1>
             <div id="call-status">未接続</div>
-            <button id="join-btn" onclick="joinCall('${id}')">通話に参加</button>
-            <button id="leave-btn" style="display:none;" onclick="leaveCall()">終了</button>
+            <div style="display:flex; gap:10px; margin-bottom:20px;">
+                <button id="join-btn" onclick="joinCall('${id}')">通話開始</button>
+                <button id="leave-btn" style="display:none; border-color:#f87171; color:#f87171;" onclick="leaveCall()">終了</button>
+            </div>
             <div class="form-area">
-                <textarea id="replyText" rows="3" placeholder="書き込む..."></textarea>
-                <button onclick="sendReply()">送信</button>
+                <textarea id="replyText" rows="3" placeholder="コメントを書く"></textarea>
+                <button onclick="sendReply()">書き込む</button>
             </div>
             <div id="post-area"></div>
         `;
@@ -183,14 +252,10 @@
             posts.sort((a, b) => (b.createdAt?.toMillis() || Date.now()) - (a.createdAt?.toMillis() || Date.now()));
             area.innerHTML = "";
             posts.forEach(p => {
-                const icon = p.icon || "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg";
                 area.innerHTML += `
                     <div class="post">
-                        <img src="${icon}" class="user-icon">
-                        <div class="post-content">
-                            <div style="color:var(--accent); font-size:0.8em; margin-bottom:5px;">${p.user}</div>
-                            <div style="white-space:pre-wrap;">${p.text}</div>
-                        </div>
+                        <div class="post-info">${p.user}</div>
+                        <div class="post-body">${p.text}</div>
                     </div>`;
             });
         });
@@ -209,7 +274,7 @@
             document.getElementById('leave-btn').style.display = 'block';
             document.getElementById('call-status').style.display = 'block';
             document.getElementById('call-status').innerText = "● 通話中";
-        } catch (e) { alert("通話失敗"); }
+        } catch (e) { alert("通話に失敗しました"); }
     }
 
     async function leaveCall() {
@@ -223,7 +288,7 @@
     async function sendReply() {
         const text = document.getElementById('replyText').value;
         if(!text.trim()) return;
-        await db.collection("posts").add({ threadId: currentThreadId, user: currentUserName, icon: currentUserIcon, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await db.collection("posts").add({ threadId: currentThreadId, user: currentUserName, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         document.getElementById('replyText').value = "";
     }
 </script>
