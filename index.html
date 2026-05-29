@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ShoBBS</title>
+
+    <link rel="apple-touch-icon" href="https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg">
+    <link rel="icon" href="https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="ShoBBS">
+
     <style>
         :root { 
             --bg: radial-gradient(circle at center, #0f172a 0%, #020617 100%); 
@@ -21,10 +27,12 @@
         input, textarea { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0, 0, 0, 0.6); color: #fff; border: 1px solid var(--border); box-sizing: border-box; border-radius: 4px; font-size: 16px; }
         button { width: 100%; padding: 14px; background: transparent; color: var(--accent); border: 1px solid var(--accent); font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
         button:hover { background: var(--accent); color: #020617; }
-        .post { border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 20px; background: rgba(255,255,255,0.03); }
+        .post { border-left: 4px solid var(--accent); padding: 15px; margin-bottom: 20px; background: rgba(255,255,255,0.03); display: flex; gap: 15px; align-items: flex-start; }
+        .user-icon { width: 50px; height: 50px; border-radius: 50%; border: 2px solid var(--accent); object-fit: cover; background: #000; flex-shrink: 0; }
+        .post-content { flex-grow: 1; }
         .nav { display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 10px; }
         .btn-small { width: auto; padding: 5px 10px; font-size: 0.8em; margin: 0; }
-        #call-status { margin: 10px 0; padding: 10px; background: rgba(0, 242, 255, 0.1); border-radius: 4px; font-size: 0.9em; text-align: center; display: none; color: var(--accent); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+        #call-status { margin: 10px 0; padding: 10px; background: rgba(0, 242, 255, 0.1); border-radius: 4px; font-size: 0.9em; text-align: center; display: none; color: var(--accent); }
     </style>
 </head>
 <body>
@@ -37,8 +45,8 @@
 
 <script>
     const AGORA_APP_ID = "1563871745f642a5a5332fe7ee3ebeba"; 
-
     let currentUserName = "";
+    let currentUserIcon = "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg"; // アイコン初期値もこれに
     let currentThreadId = null;
     let db, client, localAudioTrack;
 
@@ -54,7 +62,6 @@
     window.onload = () => {
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        // Agora クライアント作成
         client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
         showLoginPage();
     };
@@ -68,10 +75,9 @@
                 <button onclick="login()">アクセス開始</button>
             </div>
             <div style="text-align:center; margin-top:20px;">
-                <p style="font-size:0.8em; opacity:0.6;">新規利用申請</p>
                 <input type="text" id="regId" placeholder="希望ID">
                 <input type="password" id="regPin" placeholder="希望PIN">
-                <button onclick="register()" class="btn-small">申請</button>
+                <button onclick="register()" class="btn-small">利用申請</button>
             </div>
         `;
     }
@@ -84,28 +90,31 @@
         const data = snap.docs[0].data();
         if (data.pin == pin && data.isApproved) {
             currentUserName = id;
+            currentUserIcon = data.iconUrl || currentUserIcon;
             showThreadList();
-        } else { alert("認証失敗（未承認またはPIN違い）"); }
+        } else { alert("認証失敗"); }
     }
 
     async function register() {
         const id = document.getElementById('regId').value;
         const pin = document.getElementById('regPin').value;
-        if(!id || !pin) return;
-        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        alert("申請しました");
+        await db.collection("requests").add({ userId: id, pin: pin, isApproved: false, iconUrl: "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        alert("申請完了");
     }
 
     function showThreadList() {
         currentThreadId = null;
-        leaveCall(); 
+        leaveCall();
         document.getElementById('root').innerHTML = `
-            <div class="nav"><button class="btn-small" onclick="location.reload()">ログアウト</button></div>
+            <div class="nav">
+                <button class="btn-small" onclick="showProfilePage()">プロフィール設定</button>
+                <button class="btn-small" onclick="location.reload()">ログアウト</button>
+            </div>
             <h1>ShoBBS</h1>
             <div class="form-area">
-                <input type="text" id="newThreadTitle" placeholder="タイトル">
+                <input type="text" id="newThreadTitle" placeholder="スレタイ">
                 <textarea id="firstPost" placeholder="本文"></textarea>
-                <button onclick="createThread()">スレを立てる</button>
+                <button onclick="createThread()">スレ作成</button>
             </div>
             <div id="list-area">同期中...</div>
         `;
@@ -119,12 +128,35 @@
         });
     }
 
+    function showProfilePage() {
+        document.getElementById('root').innerHTML = `
+            <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
+            <h1>プロフィール設定</h1>
+            <div class="form-area" style="text-align:center;">
+                <img src="${currentUserIcon}" class="user-icon" style="width:100px; height:100px; margin-bottom:10px;">
+                <input type="text" id="newIconUrl" placeholder="アイコン画像のURLを入力" value="${currentUserIcon}">
+                <button onclick="updateProfile()">保存する</button>
+            </div>
+        `;
+    }
+
+    async function updateProfile() {
+        const url = document.getElementById('newIconUrl').value;
+        const snap = await db.collection("requests").where("userId", "==", currentUserName).get();
+        if (!snap.empty) {
+            await snap.docs[0].ref.update({ iconUrl: url });
+            currentUserIcon = url;
+            alert("保存しました！");
+            showThreadList();
+        }
+    }
+
     async function createThread() {
         const title = document.getElementById('newThreadTitle').value;
         const text = document.getElementById('firstPost').value;
         if(!title || !text) return;
         const threadRef = await db.collection("threads").add({ title, creator: currentUserName, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-        await db.collection("posts").add({ threadId: threadRef.id, user: currentUserName, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await db.collection("posts").add({ threadId: threadRef.id, user: currentUserName, icon: currentUserIcon, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         showThreadDetail(threadRef.id, title);
     }
 
@@ -133,15 +165,12 @@
         document.getElementById('root').innerHTML = `
             <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
             <h1>ShoBBS</h1>
-            <div style="text-align:center; color:var(--accent); font-weight:bold; margin-bottom:10px;">【${title}】</div>
-            
             <div id="call-status">未接続</div>
             <button id="join-btn" onclick="joinCall('${id}')">通話に参加</button>
-            <button id="leave-btn" style="display:none; border-color:#ff4b4b; color:#ff4b4b;" onclick="leaveCall()">通話を終了</button>
-
+            <button id="leave-btn" style="display:none;" onclick="leaveCall()">終了</button>
             <div class="form-area">
-                <textarea id="replyText" rows="3" placeholder="メッセージを書く"></textarea>
-                <button onclick="sendReply()">書き込む</button>
+                <textarea id="replyText" rows="3" placeholder="書き込む..."></textarea>
+                <button onclick="sendReply()">送信</button>
             </div>
             <div id="post-area"></div>
         `;
@@ -154,59 +183,47 @@
             posts.sort((a, b) => (b.createdAt?.toMillis() || Date.now()) - (a.createdAt?.toMillis() || Date.now()));
             area.innerHTML = "";
             posts.forEach(p => {
-                area.innerHTML += `<div class="post"><div style="color:var(--accent); font-size:0.8em; margin-bottom:5px;">投稿者: ${p.user}</div><div style="white-space:pre-wrap;">${p.text}</div></div>`;
+                const icon = p.icon || "https://chromebookuser0001-cyber.github.io/sho-/shophoto.jpg";
+                area.innerHTML += `
+                    <div class="post">
+                        <img src="${icon}" class="user-icon">
+                        <div class="post-content">
+                            <div style="color:var(--accent); font-size:0.8em; margin-bottom:5px;">${p.user}</div>
+                            <div style="white-space:pre-wrap;">${p.text}</div>
+                        </div>
+                    </div>`;
             });
         });
     }
 
-    // --- Agora 通話ロジック ---
     async function joinCall(channelId) {
         try {
-            // 他の人が入ってきた時の処理
             client.on("user-published", async (user, mediaType) => {
                 await client.subscribe(user, mediaType);
-                if (mediaType === "audio") {
-                    user.audioTrack.play();
-                }
+                if (mediaType === "audio") user.audioTrack.play();
             });
-
-            // チャンネルに参加 (TokenはnullでOK)
             await client.join(AGORA_APP_ID, channelId, null, null);
-            
-            // マイクを起動して配信
             localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
             await client.publish([localAudioTrack]);
-
             document.getElementById('join-btn').style.display = 'none';
             document.getElementById('leave-btn').style.display = 'block';
-            const status = document.getElementById('call-status');
-            status.style.display = 'block';
-            status.innerText = "● 通話中";
-        } catch (e) {
-            console.error(e);
-            alert("接続エラー: " + e.message);
-        }
+            document.getElementById('call-status').style.display = 'block';
+            document.getElementById('call-status').innerText = "● 通話中";
+        } catch (e) { alert("通話失敗"); }
     }
 
     async function leaveCall() {
-        if (localAudioTrack) {
-            localAudioTrack.stop();
-            localAudioTrack.close();
-            localAudioTrack = null;
-        }
+        if (localAudioTrack) { localAudioTrack.stop(); localAudioTrack.close(); localAudioTrack = null; }
         await client.leave();
-        const joinBtn = document.getElementById('join-btn');
-        if(joinBtn) joinBtn.style.display = 'block';
-        const leaveBtn = document.getElementById('leave-btn');
-        if(leaveBtn) leaveBtn.style.display = 'none';
-        const status = document.getElementById('call-status');
-        if(status) status.style.display = 'none';
+        if(document.getElementById('join-btn')) document.getElementById('join-btn').style.display = 'block';
+        if(document.getElementById('leave-btn')) document.getElementById('leave-btn').style.display = 'none';
+        if(document.getElementById('call-status')) document.getElementById('call-status').style.display = 'none';
     }
 
     async function sendReply() {
         const text = document.getElementById('replyText').value;
         if(!text.trim()) return;
-        await db.collection("posts").add({ threadId: currentThreadId, user: currentUserName, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+        await db.collection("posts").add({ threadId: currentThreadId, user: currentUserName, icon: currentUserIcon, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
         document.getElementById('replyText').value = "";
     }
 </script>
