@@ -13,22 +13,20 @@
         body { background-color: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; line-height: 1.5; }
         .container { width: 100%; max-width: 700px; background: var(--card); border: 1px solid var(--border); min-height: 90vh; padding: 24px; box-sizing: border-box; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         h1 { text-align: center; color: var(--accent); letter-spacing: 4px; margin-bottom: 24px; font-size: 1.8em; }
-        .thread-item { padding: 18px; border: 1px solid var(--border); margin-bottom: 12px; cursor: pointer; transition: 0.2s; background: rgba(255,255,255,0.02); border-radius: 8px; }
+        .thread-item { padding: 18px; border: 1px solid var(--border); margin-bottom: 12px; cursor: pointer; transition: 0.2s; background: rgba(255,255,255,0.02); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
         .thread-item:hover { border-color: var(--accent); background: rgba(34, 211, 238, 0.05); }
         .form-area { background: rgba(0,0,0,0.2); border: 1px solid var(--border); padding: 18px; margin-bottom: 24px; border-radius: 8px; }
         input, textarea { width: 100%; padding: 12px; margin: 8px 0; background: #0f172a; color: #fff; border: 1px solid #334155; box-sizing: border-box; border-radius: 6px; font-size: 16px; outline: none; }
         button { width: 100%; padding: 12px; border: 1px solid var(--accent); background: transparent; color: var(--accent); border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 8px; }
         button:hover { background: var(--accent); color: #0f172a; }
-        .post { border-left: 3px solid var(--accent); padding: 12px 16px; margin-bottom: 16px; background: rgba(255,255,255,0.03); border-radius: 0 8px 8px 0; }
-        .post-info { color: var(--sub-text); font-size: 0.8em; margin-bottom: 4px; }
+        .post { border-left: 3px solid var(--accent); padding: 12px 16px; margin-bottom: 16px; background: rgba(255,255,255,0.03); border-radius: 0 8px 8px 0; position: relative; }
+        .post-info { color: var(--sub-text); font-size: 0.8em; margin-bottom: 4px; display: flex; justify-content: space-between; }
         .nav { display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 10px; flex-wrap: wrap; }
         .btn-small { width: auto; padding: 6px 12px; font-size: 0.75em; margin: 0; }
         .admin-btn { border-color: var(--admin-color); color: var(--admin-color); }
-        .admin-btn:hover { background: var(--admin-color); color: #fff; }
-        .req-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #334155; }
-        /* 通話ステータスのデザイン微調整 */
+        .del-btn { color: var(--admin-color); cursor: pointer; font-weight: bold; padding: 0 5px; }
         #call-status-area { margin-bottom: 15px; padding: 12px; background: rgba(34, 211, 238, 0.05); border: 1px dashed var(--border); border-radius: 8px; font-size: 0.85em; display: none; }
-        .online-list { color: var(--accent); font-weight: bold; }
+        .view-count { font-size: 0.8em; color: var(--accent); opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -42,8 +40,7 @@
     let currentUserName = "";
     let currentThreadId = null;
     let db, client, localAudioTrack;
-    let unsubscribeThreads = null;
-    let unsubscribePosts = null;
+    let unsubscribeThreads = null, unsubscribePosts = null, unsubscribePresence = null;
 
     const firebaseConfig = {
         apiKey: "AIzaSyD2-XU5R6upCUgSDJbDz7iSoEQCzrzusLk",
@@ -82,74 +79,93 @@
         alert("申請しました。adminの承認を待ってください。");
     }
 
-    function showThreadList() {
+    // 足跡（プレゼンス）更新
+    async function updatePresence(threadId) {
+        if (!currentUserName) return;
+        const ref = db.collection("presence").doc(currentUserName);
+        if (threadId) {
+            await ref.set({ threadId, lastSeen: firebase.firestore.FieldValue.serverTimestamp() });
+        } else {
+            await ref.delete();
+        }
+    }
+
+    async function showThreadList() {
         if(unsubscribeThreads) unsubscribeThreads();
         if(unsubscribePosts) unsubscribePosts();
+        if(unsubscribePresence) unsubscribePresence();
+        await updatePresence(null);
         currentThreadId = null;
         leaveCall();
+        
         let adminBtn = (currentUserName === ADMIN_USER_ID) ? `<button class="btn-small admin-btn" onclick="showAdminPage()">管理画面</button>` : "";
         document.getElementById('root').innerHTML = `<div class="nav">${adminBtn}<button class="btn-small" onclick="location.reload()">ログアウト</button></div><h1>ShoBBS</h1><div class="form-area"><input type="text" id="newThreadTitle" placeholder="スレタイ"><textarea id="firstPost" placeholder="本文"></textarea><button onclick="createThread()">新規スレッド</button></div><div id="list-area">更新中...</div>`;
-        unsubscribeThreads = db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
-            const area = document.getElementById('list-area');
-            if(!area) return;
-            area.innerHTML = "";
-            ss.forEach(doc => {
-                area.innerHTML += `<div class="thread-item" onclick="showThreadDetail('${doc.id}', '${doc.data().title.replace(/'/g, "\\'")}')">${doc.data().title}</div>`;
+        
+        // 全ユーザーの所在を監視
+        unsubscribePresence = db.collection("presence").onSnapshot(ps => {
+            const counts = {};
+            ps.forEach(d => { counts[d.data().threadId] = (counts[d.data().threadId] || 0) + 1; });
+            
+            unsubscribeThreads = db.collection("threads").orderBy("createdAt", "desc").onSnapshot(ss => {
+                const area = document.getElementById('list-area');
+                if(!area) return;
+                area.innerHTML = "";
+                ss.forEach(doc => {
+                    const count = counts[doc.id] || 0;
+                    area.innerHTML += `
+                        <div class="thread-item" onclick="showThreadDetail('${doc.id}', '${doc.data().title.replace(/'/g, "\\'")}')">
+                            <span>${doc.data().title}</span>
+                            <span class="view-count">${count > 0 ? '👀' + count : ''}</span>
+                        </div>`;
+                });
             });
         });
     }
 
-    function showThreadDetail(id, title) {
+    async function showThreadDetail(id, title) {
         if(unsubscribeThreads) unsubscribeThreads();
         if(unsubscribePosts) unsubscribePosts();
+        await updatePresence(id);
         currentThreadId = id;
+        
         document.getElementById('root').innerHTML = `
             <div class="nav"><button class="btn-small" onclick="showThreadList()">戻る</button></div>
             <h1 style="font-size:1.2em; border:none; margin-bottom:10px;">${title}</h1>
-            <div id="call-status-area">
-                <div>● 通話中: <span id="online-users" class="online-list">あなたのみ</span></div>
-            </div>
-            <div style="display:flex; gap:10px; margin-bottom:20px;">
-                <button id="join-btn" onclick="joinCall('${id}')">通話に参加</button>
-                <button id="leave-btn" style="display:none; border-color:#f87171; color:#f87171;" onclick="leaveCall()">通話を終了</button>
-            </div>
-            <div class="form-area">
-                <textarea id="replyText" rows="3" placeholder="コメントを書く"></textarea>
-                <button onclick="sendReply()">書き込む</button>
-            </div>
+            <div id="call-status-area"><div>● 通話中: <span id="online-users" style="color:var(--accent); font-weight:bold;">あなたのみ</span></div></div>
+            <div style="display:flex; gap:10px; margin-bottom:20px;"><button id="join-btn" onclick="joinCall('${id}')">通話に参加</button><button id="leave-btn" style="display:none; border-color:#f87171; color:#f87171;" onclick="leaveCall()">通話を終了</button></div>
+            <div class="form-area"><textarea id="replyText" rows="3" placeholder="コメントを書く"></textarea><button onclick="sendReply()">書き込む</button></div>
             <div id="post-area"></div>`;
 
         unsubscribePosts = db.collection("posts").where("threadId", "==", id).onSnapshot(ss => {
             const area = document.getElementById('post-area');
             if(!area) return;
             let posts = [];
-            ss.forEach(doc => posts.push(doc.data()));
+            ss.forEach(doc => posts.push({id: doc.id, ...doc.data()}));
             posts.sort((a, b) => (b.createdAt?.toMillis() || Date.now()) - (a.createdAt?.toMillis() || Date.now()));
             area.innerHTML = "";
             posts.forEach(p => {
-                area.innerHTML += `<div class="post"><div class="post-info">${p.user}</div><div class="post-body">${p.text}</div></div>`;
+                const delBtn = (currentUserName === ADMIN_USER_ID) ? `<span class="del-btn" onclick="deletePost('${p.id}')">×</span>` : "";
+                area.innerHTML += `<div class="post"><div class="post-info"><span>${p.user}</span>${delBtn}</div><div class="post-body">${p.text}</div></div>`;
             });
         });
     }
 
+    async function deletePost(postId) {
+        if(!confirm("この投稿を削除しますか？")) return;
+        await db.collection("posts").doc(postId).delete();
+    }
+
     async function joinCall(channelId) {
         try {
-            // Agoraに自分の名前を送信するために、uidとして使用（本来は数値だが文字列も受け付ける設定で対応）
             await client.join(AGORA_APP_ID, channelId, null, currentUserName);
-            
             client.on("user-published", async (user, mediaType) => {
                 await client.subscribe(user, mediaType);
                 if (mediaType === "audio") user.audioTrack.play();
                 updateOnlineUsers();
             });
-
-            client.on("user-left", () => {
-                updateOnlineUsers();
-            });
-
+            client.on("user-left", () => updateOnlineUsers());
             localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
             await client.publish([localAudioTrack]);
-            
             document.getElementById('join-btn').style.display = 'none';
             document.getElementById('leave-btn').style.display = 'block';
             document.getElementById('call-status-area').style.display = 'block';
@@ -160,9 +176,7 @@
     function updateOnlineUsers() {
         const area = document.getElementById('online-users');
         if(!area) return;
-        // リモートユーザー（自分以外）のIDを取得
-        const remoteUsers = client.remoteUsers.map(u => u.uid);
-        const allUsers = [currentUserName, ...remoteUsers];
+        const allUsers = [currentUserName, ...client.remoteUsers.map(u => u.uid)];
         area.innerText = allUsers.join(", ");
     }
 
